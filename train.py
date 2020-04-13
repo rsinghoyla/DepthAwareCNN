@@ -49,7 +49,7 @@ for epoch in range(start_epoch, opt.nepochs):
         iter_start_time = time.time()
         total_steps += opt.batchSize
         epoch_iter += opt.batchSize
-
+        #print('batchSize',opt.batchSize)
         ############## Forward and Backward Pass ######################
         model.forward(data)
         model.backward(total_steps, opt.nepochs * dataset.__len__() * opt.batchSize + 1)

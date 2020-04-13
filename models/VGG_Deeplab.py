@@ -1,9 +1,9 @@
-from model_utils import *
+from .model_utils import *
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 import math
-from .ops.depthconv.modules import DepthConv
-from .ops.depthavgpooling.modules import Depthavgpooling
+#from .ops.depthconv.modules import DepthConv
+#from .ops.depthavgpooling.modules import Depthavgpooling
 import torch
 import torchvision
 
@@ -219,7 +219,8 @@ class VGG_layer(nn.Module):
         self.conv5_3 = ConvModule(512, 512, bn=batch_norm, dilation=2, padding=2,
                                   maxpool=True, pool_kernel=3, pool_stride=1, pool_pad=1)
         self.pool5a = nn.AvgPool2d(kernel_size=3, stride=1,padding=1)
-        self.pool5a_d = Depthavgpooling(kernel_size=3, stride=1,padding=1)
+        if self.depthconv:
+            self.pool5a_d = Depthavgpooling(kernel_size=3, stride=1,padding=1)
 
     def forward(self, x, depth=None):
         # print x.size()
@@ -489,9 +490,9 @@ class VGG(nn.Module):
                 if isinstance(j, nn.Conv2d):
                     if j.weight.requires_grad:
                         yield j.weight
-                elif isinstance(j, DepthConv):
-                    if j.weight.requires_grad:
-                        yield j.weight
+                #elif isinstance(j, DepthConv):
+                #if j.weight.requires_grad:
+                #    yield j.weight
 
 
     def get_2x_lr_params_NOscale(self):
@@ -532,10 +533,10 @@ class VGG(nn.Module):
                     if j.bias is not None:
                         if j.bias.requires_grad:
                             yield j.bias
-                elif isinstance(j, DepthConv):
-                    if j.bias is not None:
-                        if j.bias.requires_grad:
-                            yield j.bias
+                #elif isinstance(j, DepthConv):
+                #    if j.bias is not None:
+                #        if j.bias.requires_grad:
+                #            yield j.bias
 
 
     def get_10x_lr_params(self):

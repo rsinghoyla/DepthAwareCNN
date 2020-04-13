@@ -6,6 +6,7 @@ import torch
 import h5py
 from data.base_dataset import *
 from PIL import Image
+import scipy.io
 import math, random
 import time
 
@@ -19,47 +20,56 @@ def make_dataset_fromlst(listfilename):
     segs = []
     depths = []
     HHAs = []
-
+    data = []
     with open(listfilename) as f:
-        content = f.readlines()
+        content = f.read().splitlines()
         for x in content:
-            imgname, segname, depthname, HHAname = x.strip().split(' ')
-            images += [imgname]
-            segs += [segname]
-            depths += [depthname]
-            HHAs += [HHAname]
-
-    return {'images':images, 'segs':segs, 'HHAs':HHAs, 'depths':depths}
+            #imgname, segname, depthname, HHAname = x.strip().split(' ')
+            #images += [imgname]
+            #segs += [segname]
+            #depths += [depthname]
+            #HHAs += [HHAname]
+            data += [x]
+            
+    #return {'images':images, 'segs':segs, 'HHAs':HHAs, 'depths':depths,}
+    return {'data':data}
 
 class NYUDataset(BaseDataset):
     def initialize(self, opt):
         self.opt = opt
         np.random.seed(int(time.time()))
         self.paths_dict = make_dataset_fromlst(opt.list)
-        self.len = len(self.paths_dict['images'])
+        self.len = len(self.paths_dict['data'])
         self.label_weight = torch.Tensor(label_weight)
         self.datafile = 'nyuv2_dataset_crop.py'
+        #print(self.len)
+        #print(self.paths_dict)
 
     def __getitem__(self, index):
         #self.paths['images'][index]
         # print self.opt.scale,self.opt.flip,self.opt.crop,self.opt.colorjitter
-        img = np.asarray(Image.open(self.paths_dict['images'][index]))#.astype(np.uint8)
-        depth = np.asarray(Image.open(self.paths_dict['depths'][index])).astype(np.float32)/120. # 1/10 * depth
+        # img = np.asarray(Image.open(self.paths_dict['images'][index]))#.astype(np.uint8)
+        # depth = np.asarray(Image.open(self.paths_dict['depths'][index])).astype(np.float32)/120. # 1/10 * depth
 
-        HHA = np.asarray(Image.open(self.paths_dict['HHAs'][index]))
-        seg = np.asarray(Image.open(self.paths_dict['segs'][index])).astype(np.uint8)
-
+        # HHA = np.asarray(Image.open(self.paths_dict['HHAs'][index]))
+        # seg = np.asarray(Image.open(self.paths_dict['segs'][index])).astype(np.uint8)
+        print(index,self.paths_dict['data'][index])
+        data = scipy.io.loadmat(self.paths_dict['data'][index])
+        img = data['images']
+        depth = np.squeeze(data['depths'])
+    
+        seg = np.squeeze(data['segs40'].astype('uint8')-1)
+        HHA = []
 
         params = get_params(self.opt, seg.shape)
         depth_tensor_tranformed = transform(depth, params, normalize=False,istrain=self.opt.isTrain)
         seg_tensor_tranformed = transform(seg, params, normalize=False,method='nearest',istrain=self.opt.isTrain)
         if self.opt.inputmode == 'bgr-mean':
             img_tensor_tranformed = transform(img, params, normalize=False, istrain=self.opt.isTrain, option=1)
-            HHA_tensor_tranformed = transform(HHA, params, normalize=False, istrain=self.opt.isTrain, option=2)
+            #HHA_tensor_tranformed = transform(HHA, params, normalize=False, istrain=self.opt.isTrain, option=2)
         else:
             img_tensor_tranformed = transform(img, params, istrain=self.opt.isTrain, option=1)
-            HHA_tensor_tranformed = transform(HHA, params, istrain=self.opt.isTrain, option=2)
-
+            #HHA_tensor_tranformed = transform(HHA, params, istrain=self.opt.isTrain, option=2)
 
         # print img_tensor_tranformed
         # print(np.unique(depth_tensor_tranformed.numpy()).shape)
@@ -67,8 +77,8 @@ class NYUDataset(BaseDataset):
         return {'image':img_tensor_tranformed,
                 'depth':depth_tensor_tranformed,
                 'seg': seg_tensor_tranformed,
-                'HHA': HHA_tensor_tranformed,
-                'imgpath': self.paths_dict['segs'][index]}
+                #'HHA': HHA_tensor_tranformed,
+                'imgpath': self.paths_dict['data'][index]}
 
     def __len__(self):
         return self.len
@@ -81,32 +91,38 @@ class NYUDataset_val(BaseDataset):
         self.opt = opt
         np.random.seed(8964)
         self.paths_dict = make_dataset_fromlst(opt.vallist)
-        self.len = len(self.paths_dict['images'])
+        self.len = len(self.paths_dict['data'])
 
     def __getitem__(self, index):
         #self.paths['images'][index]
-        img = np.asarray(Image.open(self.paths_dict['images'][index]))#.astype(np.uint8)
-        # print (img)
-        depth = np.asarray(Image.open(self.paths_dict['depths'][index])).astype(np.float32)/120. # 1/5 * depth
-        HHA = np.asarray(Image.open(self.paths_dict['HHAs'][index]))
-        seg = np.asarray(Image.open(self.paths_dict['segs'][index])).astype(np.uint8)
+        # img = np.asarray(Image.open(self.paths_dict['images'][index]))#.astype(np.uint8)
+        # # print (img)
+        # depth = np.asarray(Image.open(self.paths_dict['depths'][index])).astype(np.float32)/120. # 1/5 * depth
+        # HHA = np.asarray(Image.open(self.paths_dict['HHAs'][index]))
+        # seg = np.asarray(Image.open(self.paths_dict['segs'][index])).astype(np.uint8)
 
+        data = scipy.io.loadmat(self.paths_dict['data'][index])
+        img = data['images']
+        depth = data['depths']
+        seg = data['segs40'].astype('uint8')
+        HHA = []
+        
         params = get_params(self.opt, seg.shape, test=True)
         depth_tensor_tranformed = transform(depth, params, normalize=False,istrain=self.opt.isTrain)
         seg_tensor_tranformed = transform(seg, params, normalize=False,method='nearest',istrain=self.opt.isTrain)
         # HHA_tensor_tranformed = transform(HHA, params,istrain=self.opt.isTrain)
         if self.opt.inputmode == 'bgr-mean':
             img_tensor_tranformed = transform(img, params, normalize=False, istrain=self.opt.isTrain, option=1)
-            HHA_tensor_tranformed = transform(HHA, params, normalize=False, istrain=self.opt.isTrain, option=2)
+            #HHA_tensor_tranformed = transform(HHA, params, normalize=False, istrain=self.opt.isTrain, option=2)
         else:
             img_tensor_tranformed = transform(img, params, istrain=self.opt.isTrain, option=1)
-            HHA_tensor_tranformed = transform(HHA, params, istrain=self.opt.isTrain, option=2)
+            #HHA_tensor_tranformed = transform(HHA, params, istrain=self.opt.isTrain, option=2)
 
         return {'image':img_tensor_tranformed,
                 'depth':depth_tensor_tranformed,
                 'seg': seg_tensor_tranformed,
-                'HHA': HHA_tensor_tranformed,
-                'imgpath': self.paths_dict['segs'][index]}
+                #'HHA': HHA_tensor_tranformed,
+                'imgpath': self.paths_dict['data'][index]}
 
     def __len__(self):
         return self.len

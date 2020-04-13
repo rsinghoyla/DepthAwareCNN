@@ -11,13 +11,13 @@ from torch.autograd import Variable
 from collections import OrderedDict
 from tensorboardX import SummaryWriter
 import os
-import VGG_Deeplab as VGG_Deeplab
+from .VGG_Deeplab import vgg16
 
 
 class Deeplab_VGG(nn.Module):
     def __init__(self, num_classes, depthconv=False):
         super(Deeplab_VGG,self).__init__()
-        self.Scale = VGG_Deeplab.vgg16(num_classes=num_classes,depthconv=depthconv)
+        self.Scale = vgg16(num_classes=num_classes,depthconv=depthconv)
 
     def forward(self,x, depth=None):
         output = self.Scale(x,depth) # for original scale
@@ -33,7 +33,10 @@ class Deeplab_Solver(BaseModel):
             self.model = Deeplab_VGG(self.opt.label_nc, self.opt.depthconv)
 
         if self.opt.isTrain:
-            self.criterionSeg = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
+            if torch.cuda.is_available():
+                self.criterionSeg = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
+            else:
+                self.criterionSeg = torch.nn.CrossEntropyLoss(ignore_index=255)#,reduction='none')
             # self.criterionSeg = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
             # self.criterionSeg = nn.NLLLoss2d(ignore_index=255)#.cuda()
 
@@ -71,21 +74,31 @@ class Deeplab_Solver(BaseModel):
                 self.load()
                 print("Successfully loaded model, continue training....!")
 
-        self.model.cuda()
+        if torch.cuda.is_available():
+            self.model.cuda()
         self.normweightgrad=0.
         # if len(opt.gpu_ids):#opt.isTrain and
         #     self.model = torch.nn.DataParallel(self.model, device_ids=opt.gpu_ids)
 
     def forward(self, data, isTrain=True):
         self.model.zero_grad()
-
-        self.image = Variable(data['image'], volatile=not isTrain).cuda()
+        if torch.cuda.is_available():
+            self.image = Variable(data['image'], volatile=not isTrain).cuda()
+        else:
+            self.image = Variable(data['image'], volatile=not isTrain)
+            
         if 'depth' in data.keys():
-            self.depth = Variable(data['depth'], volatile=not isTrain).cuda()
+            if torch.cuda.is_available():
+                self.depth = Variable(data['depth'], volatile=not isTrain).cuda()
+            else:
+                self.depth = Variable(data['depth'], volatile=not isTrain)
         else:
             self.depth = None
         if data['seg'] is not None:
-            self.seggt = Variable(data['seg'], volatile=not isTrain).cuda()
+            if torch.cuda.is_available():
+                self.seggt = Variable(data['seg'], volatile=not isTrain).cuda()
+            else:
+                self.seggt = Variable(data['seg'], volatile=not isTrain)
         else:
             self.seggt = None
 
@@ -96,8 +109,10 @@ class Deeplab_Solver(BaseModel):
         # self.segpred = nn.functional.log_softmax(nn.functional.upsample(self.segpred, size=(input_size[2], input_size[3]), mode='bilinear'))
 
         if self.opt.isTrain:
+            #print(self.seggt.shape,self.segpred.shape)
             self.loss = self.criterionSeg(self.segpred, torch.squeeze(self.seggt,1).long())
-            self.averageloss += [self.loss.data[0]]
+            #print(self.loss.data)
+            self.averageloss += [self.loss.data.item()]
 
         segpred = self.segpred.max(1, keepdim=True)[1]
         return self.seggt, segpred
@@ -172,10 +187,10 @@ class Deeplab_Solver(BaseModel):
 
         self.writer.add_scalar(self.opt.name+'/Learning_Rate/', lr, step)
 
-	self.optimizer.param_groups[0]['lr'] = lr
-	self.optimizer.param_groups[1]['lr'] = lr
-	self.optimizer.param_groups[2]['lr'] = lr
-	self.optimizer.param_groups[3]['lr'] = lr
+        self.optimizer.param_groups[0]['lr'] = lr
+        self.optimizer.param_groups[1]['lr'] = lr
+        self.optimizer.param_groups[2]['lr'] = lr
+        self.optimizer.param_groups[3]['lr'] = lr
 	# self.optimizer.param_groups[0]['lr'] = lr
 	# self.optimizer.param_groups[1]['lr'] = lr*10
 	# self.optimizer.param_groups[2]['lr'] = lr*2 #* 100
