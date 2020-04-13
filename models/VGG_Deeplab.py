@@ -151,6 +151,7 @@ class VGG_layer2(nn.Module):
         depth = self.downsample_depth3_1(depth)
         #     x = self.conv3_1(x, self.conv3_1_depthconvweight * depth)
         # else:
+        #print('zzz',depth.shape,x.shape)
         x = self.conv3_1(x)
         x = self.conv3_2(x)
         x = self.conv3_3(x)

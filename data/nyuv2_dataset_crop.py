@@ -104,7 +104,7 @@ class NYUDataset_val(BaseDataset):
         data = scipy.io.loadmat(self.paths_dict['data'][index])
         img = data['images']
         depth = data['depths']
-        seg = data['segs40'].astype('uint8')
+        seg = data['segs40'].astype('uint8')-1
         HHA = []
         
         params = get_params(self.opt, seg.shape, test=True)
