@@ -61,19 +61,20 @@ class ConvModule(nn.Module):
 
 class DepthConvModule(nn.Module):
 
-    def __init__(self, inplanes, planes, kernel_size=3, stride=1, padding=1, dilation=1,bn=False):
+    def __init__(self, inplanes, planes, kernel_size=3, stride=1, padding=1, dilation=1,bn=False,deformable_groups=1):
         super(DepthConvModule, self).__init__()
 
         #conv2d = DepthConv(inplanes,planes,kernel_size=kernel_size,stride=stride,padding=padding,dilation=dilation)
-        
-        self.conv_offset_mask = nn.Conv2d(1, planes, kernel_size=3, stride=stride,
+        channels_ = deformable_groups * 3 * kernel_size * kernel_size
+        #print('inplanes',inplanes,channels_)
+        self.conv_offset_mask = nn.Conv2d(1, channels_, kernel_size=kernel_size, stride=stride,
                                      padding=padding, bias=True)
         self.conv_offset_mask.weight.data.zero_()
         self.conv_offset_mask.bias.data.zero_()
         
         conv2d = DCNv2(inplanes, planes, (kernel_size, kernel_size),
                        stride=stride, padding=padding, dilation=dilation,
-                       deformable_groups=1)
+                       deformable_groups=deformable_groups)
         layers = []
         if bn:
             layers += [nn.BatchNorm2d(planes), nn.ReLU(inplace=True)]
@@ -82,13 +83,13 @@ class DepthConvModule(nn.Module):
         self.layers = nn.Sequential(*([conv2d]+layers))#(*layers)
 
     def forward(self, x, depth):
-        print('zxzz',x.shape,depth.shape)
+        #print('zxzz',x.shape,depth.shape)
         out = self.conv_offset_mask(depth)
         o1, o2, mask = torch.chunk(out, 3, dim=1)
         offset = torch.cat((o1, o2), dim=1)
         mask = torch.sigmoid(mask)
         mask = torch.ones_like(mask)
-        print('xxx',offset.shape)
+        #print('xxx',offset.shape,out.shape,mask.shape)
         for im,module in enumerate(self.layers._modules.values()):
             if im==0:
                 x = module(x,offset,mask)

@@ -109,7 +109,7 @@ class Deeplab_Solver(BaseModel):
         # self.segpred = nn.functional.log_softmax(nn.functional.upsample(self.segpred, size=(input_size[2], input_size[3]), mode='bilinear'))
 
         if self.opt.isTrain:
-            print(self.seggt.shape,self.segpred.shape,torch.max(self.seggt),torch.min(self.seggt))
+            #print(self.seggt.shape,self.segpred.shape,torch.max(self.seggt),torch.min(self.seggt))
             self.loss = self.criterionSeg(self.segpred, torch.squeeze(self.seggt,1).long())
             #print(self.loss.data)
             self.averageloss += [self.loss.data.item()]
