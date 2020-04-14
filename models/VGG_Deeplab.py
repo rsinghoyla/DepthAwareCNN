@@ -65,10 +65,11 @@ class DepthConvModule(nn.Module):
         super(DepthConvModule, self).__init__()
 
         #conv2d = DepthConv(inplanes,planes,kernel_size=kernel_size,stride=stride,padding=padding,dilation=dilation)
-        conv_offset_mask = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride,
+        
+        self.conv_offset_mask = nn.Conv2d(1, planes, kernel_size=3, stride=stride,
                                      padding=padding, bias=True)
-        conv_offset_mask.weight.data.zero_()
-        conv_offset_mask.bias.data.zero_()
+        self.conv_offset_mask.weight.data.zero_()
+        self.conv_offset_mask.bias.data.zero_()
         
         conv2d = DCNv2(inplanes, planes, (kernel_size, kernel_size),
                        stride=stride, padding=padding, dilation=dilation,
@@ -81,13 +82,13 @@ class DepthConvModule(nn.Module):
         self.layers = nn.Sequential(*([conv2d]+layers))#(*layers)
 
     def forward(self, x, depth):
-
+        print('zxzz',x.shape,depth.shape)
         out = self.conv_offset_mask(depth)
         o1, o2, mask = torch.chunk(out, 3, dim=1)
         offset = torch.cat((o1, o2), dim=1)
         mask = torch.sigmoid(mask)
         mask = torch.ones_like(mask)
-        
+        print('xxx',offset.shape)
         for im,module in enumerate(self.layers._modules.values()):
             if im==0:
                 x = module(x,offset,mask)
@@ -389,8 +390,8 @@ class Classifier_Module2(nn.Module):
     def __init__(self, num_classes, inplanes, depthconv=False):
         super(Classifier_Module2, self).__init__()
         # [6, 12, 18, 24]
-        self.depthconv = depthconv
-        if depthconv:
+        self.depthconv = False
+        if self.depthconv:
             self.fc6_2_depthconvweight = 1.#nn.Parameter(torch.ones(1))
             self.fc6_2 = DepthConv(inplanes, 1024, kernel_size=3, stride=1, padding=12, dilation=12)
             self.downsample_depth = None
