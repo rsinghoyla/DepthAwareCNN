@@ -4,6 +4,8 @@ import torch.utils.model_zoo as model_zoo
 import math
 #from .ops.depthconv.modules import DepthConv
 #from .ops.depthavgpooling.modules import Depthavgpooling
+from dcn_v2 import dcn_v2_conv, DCNv2, DCN
+from dcn_v2 import dcn_v2_pooling, DCNv2Pooling, DCNPooling
 import torch
 import torchvision
 
@@ -62,7 +64,15 @@ class DepthConvModule(nn.Module):
     def __init__(self, inplanes, planes, kernel_size=3, stride=1, padding=1, dilation=1,bn=False):
         super(DepthConvModule, self).__init__()
 
-        conv2d = DepthConv(inplanes,planes,kernel_size=kernel_size,stride=stride,padding=padding,dilation=dilation)
+        #conv2d = DepthConv(inplanes,planes,kernel_size=kernel_size,stride=stride,padding=padding,dilation=dilation)
+        conv_offset_mask = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride,
+                                     padding=padding, bias=True)
+        conv_offset_mask.weight.data.zero_()
+        conv_offset_mask.bias.data.zero_()
+        
+        conv2d = DCNv2(inplanes, planes, (kernel_size, kernel_size),
+                       stride=stride, padding=padding, dilation=dilation,
+                       deformable_groups=1)
         layers = []
         if bn:
             layers += [nn.BatchNorm2d(planes), nn.ReLU(inplace=True)]
@@ -72,9 +82,15 @@ class DepthConvModule(nn.Module):
 
     def forward(self, x, depth):
 
+        out = self.conv_offset_mask(depth)
+        o1, o2, mask = torch.chunk(out, 3, dim=1)
+        offset = torch.cat((o1, o2), dim=1)
+        mask = torch.sigmoid(mask)
+        mask = torch.ones_like(mask)
+        
         for im,module in enumerate(self.layers._modules.values()):
             if im==0:
-                x = module(x,depth)
+                x = module(x,offset,mask)
             else:
                 x = module(x)
         # x = self.conv2d(x, depth)
@@ -180,6 +196,7 @@ class VGG_layer(nn.Module):
         if self.depthconv:
             self.conv1_1_depthconvweight = 1.#nn.Parameter(torch.ones(1))
             self.conv1_1 = DepthConvModule(3, 64, bn=batch_norm)
+            
         else:
             self.conv1_1 = ConvModule(3, 64, bn=batch_norm)
         self.conv1_2 = ConvModule(64, 64, bn=batch_norm, maxpool=True)
@@ -220,8 +237,8 @@ class VGG_layer(nn.Module):
         self.conv5_3 = ConvModule(512, 512, bn=batch_norm, dilation=2, padding=2,
                                   maxpool=True, pool_kernel=3, pool_stride=1, pool_pad=1)
         self.pool5a = nn.AvgPool2d(kernel_size=3, stride=1,padding=1)
-        if self.depthconv:
-            self.pool5a_d = Depthavgpooling(kernel_size=3, stride=1,padding=1)
+        #if self.depthconv:
+        #    self.pool5a_d = Depthavgpooling(kernel_size=3, stride=1,padding=1)
 
     def forward(self, x, depth=None):
         # print x.size()
@@ -261,10 +278,10 @@ class VGG_layer(nn.Module):
         x = self.conv5_2(x)
         x = self.conv5_3(x)
         # x = self.pool5a(x,depth)
-        if self.depthconv:
-            x = self.pool5a_d(x,depth)
-        else:
-            x = self.pool5a(x)
+        # if self.depthconv:
+        #     x = self.pool5a_d(x,depth)
+        # else:
+        x = self.pool5a(x)
 
         return x, depth
 
