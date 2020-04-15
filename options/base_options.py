@@ -19,6 +19,8 @@ class BaseOptions():
         self.parser.add_argument('--encoder', type=str, default='resnet50_dilated8', help='pretrained_model')
         self.parser.add_argument('--decoder', type=str, default='psp_bilinear', help='pretrained_model')
         self.parser.add_argument('--depthconv', action='store_true', help='if specified, use depthconv')
+        self.parser.add_argument('--deformconv', action='store_true', help='if specified, use deformconv')
+        self.parser.add_argument('--use_depth', action='store_true', help='if specified, use depth for deformconv')
         self.parser.add_argument('--depthglobalpool', action='store_true', help='if specified, use global pooling with depth')
         self.parser.add_argument('--pretrained_model', type=str, default='', help='pretrained_model')
         self.parser.add_argument('--which_epoch', type=str, default='latest', help='which epoch to load? set to latest to use latest cached model')

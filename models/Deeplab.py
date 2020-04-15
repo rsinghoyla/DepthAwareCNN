@@ -15,9 +15,9 @@ from .VGG_Deeplab import vgg16
 
 
 class Deeplab_VGG(nn.Module):
-    def __init__(self, num_classes, depthconv=False):
+    def __init__(self, num_classes, depthconv=False, deformconv = False, use_depth = False):
         super(Deeplab_VGG,self).__init__()
-        self.Scale = vgg16(num_classes=num_classes,depthconv=depthconv)
+        self.Scale = vgg16(num_classes=num_classes,depthconv=depthconv, deformconv = deformconv, use_depth = use_depth)
 
     def forward(self,x, depth=None):
         output = self.Scale(x,depth) # for original scale
@@ -30,7 +30,7 @@ class Deeplab_Solver(BaseModel):
         BaseModel.initialize(self, opt)
         self.encoder = encoder
         if encoder == 'VGG':
-            self.model = Deeplab_VGG(self.opt.label_nc, self.opt.depthconv)
+            self.model = Deeplab_VGG(self.opt.label_nc, self.opt.depthconv,deformconv=self.opt.deformconv,use_depth=self.opt.use_depth)
 
         if self.opt.isTrain:
             if torch.cuda.is_available():
