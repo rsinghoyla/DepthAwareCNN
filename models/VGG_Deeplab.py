@@ -225,12 +225,13 @@ class VGG_layer2(nn.Module):
 
 class VGG_layer(nn.Module):
 
-    def __init__(self, batch_norm=False, depthconv=False,deformconv=False,use_depth=False):
+    def __init__(self, batch_norm=False, depthconv=False,deformconv=False,use_depth=False,deformlayers=['conv1','conv2','conv3']):
         super(VGG_layer, self).__init__()
         in_channels = 3
         self.depthconv = depthconv
         self.deformconv = deformconv
         self.use_depth = use_depth
+        self.deformlayers = deformlayers
         if self.depthconv:
             self.use_depth = True
         
@@ -238,29 +239,27 @@ class VGG_layer(nn.Module):
         self.conv1_1_depthconvweight = 1.#nn.Parameter(torch.ones(1))
         if self.depthconv:
             self.conv1_1 = DepthConvModule(3, 64, bn=batch_norm)
-        elif self.deformconv:
+        elif self.deformconv and 'conv1' in self.deformlayers:
             self.conv1_1 = DeFormConvModule(3, 64, bn=batch_norm,use_depth=use_depth)
         else:
             self.conv1_1 = ConvModule(3, 64, bn=batch_norm)
         self.conv1_2 = ConvModule(64, 64, bn=batch_norm, maxpool=True)
 
         self.conv2_1_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+        self.downsample_depth2_1 = nn.AvgPool2d(3,padding=1,stride=2)
         if self.depthconv:
-            self.downsample_depth2_1 = nn.AvgPool2d(3,padding=1,stride=2)
             self.conv2_1 = DepthConvModule(64, 128, bn=batch_norm)
-        elif self.deformconv:
-            self.downsample_depth2_1 = nn.AvgPool2d(3,padding=1,stride=2)
+        elif self.deformconv and 'conv2' in self.deformlayers:
             self.conv2_1 = DeFormConvModule(64, 128, bn=batch_norm,use_depth=use_depth)
         else:
             self.conv2_1 = ConvModule(64, 128, bn=batch_norm)
         self.conv2_2 = ConvModule(128, 128, bn=batch_norm, maxpool=True)
 
         self.conv3_1_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+        self.downsample_depth3_1 = nn.AvgPool2d(3,padding=1,stride=2)
         if self.depthconv:
-            self.downsample_depth3_1 = nn.AvgPool2d(3,padding=1,stride=2)
             self.conv3_1 = DepthConvModule(128, 256, bn=batch_norm,use_depth=use_depth)
-        elif self.deformconv:
-            self.downsample_depth3_1 = nn.AvgPool2d(3,padding=1,stride=2)
+        elif self.deformconv and 'conv3' in self.deformlayers:
             self.conv3_1 = DeFormConvModule(128, 256, bn=batch_norm,use_depth=use_depth)
         else:
             self.conv3_1 = ConvModule(128, 256, bn=batch_norm)
@@ -268,11 +267,11 @@ class VGG_layer(nn.Module):
         self.conv3_3 = ConvModule(256, 256, bn=batch_norm, maxpool=True)
 
         self.conv4_1_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+        self.downsample_depth4_1 = nn.AvgPool2d(3,padding=1,stride=2)
+
         if self.depthconv:
-            self.downsample_depth4_1 = nn.AvgPool2d(3,padding=1,stride=2)
             self.conv4_1 = DepthConvModule(256, 512, bn=batch_norm)
-        elif self.deformconv:
-            self.downsample_depth4_1 = nn.AvgPool2d(3,padding=1,stride=2)
+        elif self.deformconv and 'conv4' in self.deformlayers:        
             self.conv4_1 = DeFormConvModule(256, 512, bn=batch_norm,use_depth=use_depth)
         else:
             self.conv4_1 = ConvModule(256, 512, bn=batch_norm)
@@ -283,7 +282,7 @@ class VGG_layer(nn.Module):
         self.conv5_1_depthconvweight = 1.#nn.Parameter(torch.ones(1))
         if self.depthconv:
             self.conv5_1 = DepthConvModule(512, 512, bn=batch_norm,dilation=2,padding=2)
-        elif self.deformconv:
+        elif self.deformconv and 'conv5' in self.deformlayers:
             self.conv5_1 = DeFormConvModule(512, 512, bn=batch_norm,dilation=2,padding=2,use_depth=use_depth)
         else:
             self.conv5_1 = ConvModule(512, 512, bn=batch_norm, dilation=2, padding=2)
@@ -303,6 +302,7 @@ class VGG_layer(nn.Module):
             x = self.conv1_1(x,self.conv1_1_depthconvweight * depth)
         else:
             x = self.conv1_1(x)
+        #print('aaa',self.conv1_1)
         x = self.conv1_2(x)
         
         if self.use_depth:
@@ -328,6 +328,7 @@ class VGG_layer(nn.Module):
             x = self.conv4_1(x, self.conv4_1_depthconvweight * depth)
         else:
             x = self.conv4_1(x)
+        #print('bbb',self.conv4_1)
         x = self.conv4_2(x)
         x = self.conv4_3(x)
         
@@ -447,21 +448,24 @@ class Classifier_Module(nn.Module):
 
 class Classifier_Module2(nn.Module):
 
-    def __init__(self, num_classes, inplanes, depthconv=False, deformconv=False, use_depth=False):
+    def __init__(self, num_classes, inplanes, depthconv=False, deformconv=False, use_depth=False,deformlayers=['conv1','conv2','conv3']):
         super(Classifier_Module2, self).__init__()
         # [6, 12, 18, 24]
         self.depthconv = depthconv
         self.deformconv = deformconv
         self.use_depth = use_depth
+        self.deformlayers = deformlayers
         if self.depthconv:
             self.use_depth = True
-            
-        if self.depthconv:
-            self.fc6_2_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+
+        self.fc6_2_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+        self.fc6_2_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+        
+        if self.depthconv:    
             self.fc6_2 = DepthConv(inplanes, 1024, kernel_size=3, stride=1, padding=12, dilation=12)
             self.downsample_depth = None
-        elif self.deformconv:
-            self.fc6_2_depthconvweight = 1.#nn.Parameter(torch.ones(1))
+        elif self.deformconv and 'fc6' in self.deformlayers:
+            
             self.fc6_2 = DeFormConvModule(inplanes, 1024, kernel_size=3, stride=1, padding=12, dilation=12,only_dcn=True,use_depth=use_depth)
             self.downsample_depth = None
         else:
@@ -482,11 +486,11 @@ class Classifier_Module2(nn.Module):
 
     def forward(self, x, depth=None):
         #print(x.shape)
-        if self.use_depth:
+        if self.use_depth and 'fc6' in self.deformlayers:
             out2 = self.fc6_2(x, self.fc6_2_depthconvweight * depth)
         else:
             out2 = self.fc6_2(x)
-            
+        #print('ccc',self.fc6_2)    
         out2 = self.fc7_2(out2)
         out2_size = out2.size()
 
@@ -509,10 +513,10 @@ class Classifier_Module2(nn.Module):
 
 class VGG(nn.Module):
 
-    def __init__(self, num_classes=20, init_weights=True, depthconv=False,bn=False,deformconv=False,use_depth=False):
+    def __init__(self, num_classes=20, init_weights=True, depthconv=False,bn=False,deformconv=False,use_depth=False,deformlayers=['conv1','conv2','conv3']):
         super(VGG, self).__init__()
-        self.features = VGG_layer(batch_norm=bn,depthconv=depthconv,deformconv=deformconv,use_depth=use_depth)
-        self.classifier = Classifier_Module2(num_classes,512,depthconv=depthconv,deformconv=deformconv,use_depth=use_depth)
+        self.features = VGG_layer(batch_norm=bn,depthconv=depthconv,deformconv=deformconv,use_depth=use_depth,deformlayers=deformlayers)
+        self.classifier = Classifier_Module2(num_classes,512,depthconv=depthconv,deformconv=deformconv,use_depth=use_depth,deformlayers=deformlayers)
 
         if init_weights:
             self._initialize_weights()

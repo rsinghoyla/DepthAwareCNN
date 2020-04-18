@@ -21,6 +21,7 @@ class BaseOptions():
         self.parser.add_argument('--depthconv', action='store_true', help='if specified, use depthconv')
         self.parser.add_argument('--deformconv', action='store_true', help='if specified, use deformconv')
         self.parser.add_argument('--use_depth', action='store_true', help='if specified, use depth for deformconv')
+        self.parser.add_argument('--deformlayers',type=str,default='conv1,conv2,conv3',help='list of layers comma seperated')
         self.parser.add_argument('--depthglobalpool', action='store_true', help='if specified, use global pooling with depth')
         self.parser.add_argument('--pretrained_model', type=str, default='', help='pretrained_model')
         self.parser.add_argument('--which_epoch', type=str, default='latest', help='which epoch to load? set to latest to use latest cached model')
@@ -72,6 +73,8 @@ class BaseOptions():
             if id >= 0:
                 self.opt.gpu_ids.append(id)
 
+        self.opt.deformlayers = self.opt.deformlayers.split(',')
+
         str_sizes = self.opt.fineSize.split(',')
         self.opt.fineSize = []
         for str_size in str_sizes:
@@ -100,4 +103,5 @@ class BaseOptions():
                 for k, v in sorted(args.items()):
                     opt_file.write('%s: %s\n' % (str(k), str(v)))
                 opt_file.write('-------------- End ----------------\n')
+            
         return self.opt
